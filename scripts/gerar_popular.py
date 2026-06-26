@@ -28,6 +28,7 @@
 import random
 import requests
 from datetime import date, timedelta
+from pathlib import Path
 
 try:
     from faker import Faker
@@ -561,7 +562,8 @@ def main():
     sql.append("")
     sql.append("SET FOREIGN_KEY_CHECKS = 1;")
 
-    with open("2_popular.sql", "w", encoding="utf-8") as f:
+    output_path = Path(__file__).with_name("2_popular.sql")
+    with output_path.open("w", encoding="utf-8") as f:
         f.write("\n".join(sql) + "\n")
 
     print("\nResumo de linhas geradas por tabela:")
