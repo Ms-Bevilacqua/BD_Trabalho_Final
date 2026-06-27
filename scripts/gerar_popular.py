@@ -10,9 +10,9 @@
 #      - /move/{id}               -> golpes (tipo, categoria, poder, etc.)
 #
 #   2) Se a API não estiver acessível (ex.: sem acesso a internet ou queda da API, 
-#      usa automaticamente um dataset de referência local (DADOS_FALLBACK_POKEMON / _GOLPE),
-#      com a MESMA estrutura de campos que a API retornaria, para que o
-#      restante da geração (treinadores, times, batalhas) continue funcionando.
+#      usa automaticamente um dataset de referência local (DADOS_FALLBACK_POKEMON / _GOLPE /
+#      _LOCALIDADES_KANTO_FALLBACK), com a MESMA estrutura de campos que a API retornaria,
+#      para que o restante da geração (treinadores, times, batalhas) continue funcionando.
 #
 #      
 #   Quando executado em uma máquina com acesso normal à internet, basta
@@ -126,6 +126,22 @@ def buscar_golpe_pokeapi(move_id):
         "precisao": m["accuracy"],
         "pp": m["pp"] or 10,
     }
+
+
+def buscar_localizacoes_pokeapi(regiao="kanto"):
+    """Usa /region/{regiao} para obter as localidades do universo Pokémon
+    e filtra apenas cidades/vilarejos/ilhas/platôs (descarta rotas, cavernas,
+    florestas e outras áreas que não fazem sentido como 'cidade natal' de
+    um treinador). Retorna None se a lista filtrada vier vazia."""
+    r = requests.get(f"{POKEAPI_BASE}/region/{regiao}", timeout=TIMEOUT).json()
+    sufixos_assentamento = ("town", "city", "island", "plateau")
+    nomes = []
+    for loc in r["locations"]:
+        slug = loc["name"]
+        if slug.endswith(sufixos_assentamento):
+            nome_formatado = slug.replace(f"{regiao}-", "").replace("-", " ").title()
+            nomes.append(nome_formatado)
+    return nomes or None
 
 
 # ---------------------------------------------------------------------
@@ -354,12 +370,28 @@ def montar_golpes():
 #    localmente, pois a PokeAPI não tem esse tipo de informação.
 # ---------------------------------------------------------------------
 
-CIDADES_BR = [
-    "Cuiabá","Várzea Grande","Rondonópolis","Sinop","Tangará da Serra",
-    "Cáceres","Campo Verde","Sorriso","Primavera do Leste","Barra do Garças",
-    "Cuiabá","Lucas do Rio Verde","Nova Mutum","Pontes e Lacerda","Juína",
-    "São Paulo","Campinas","Curitiba","Goiânia","Brasília",
+# Localidades de referência (fallback offline) — assentamentos canônicos
+# de Kanto, mesma região da Geração I usada no restante do dataset.
+_LOCALIDADES_KANTO_FALLBACK = [
+    "Pallet Town", "Viridian City", "Pewter City", "Cerulean City",
+    "Vermilion City", "Lavender Town", "Celadon City", "Fuchsia City",
+    "Saffron City", "Cinnabar Island", "Indigo Plateau", "Seafoam Islands",
 ]
+
+
+def montar_localidades():
+    if testar_pokeapi():
+        print("[INFO] PokeAPI acessível — buscando localidades de Kanto...")
+        try:
+            localidades = buscar_localizacoes_pokeapi("kanto")
+            if localidades:
+                return localidades
+        except Exception:
+            pass
+    return _LOCALIDADES_KANTO_FALLBACK
+
+
+LOCALIDADES_POKEMON = montar_localidades()
 
 FASES_TORNEIO = ["Fase de Grupos", "Oitavas de Final", "Quartas de Final", "Semifinal", "Final"]
 
@@ -383,7 +415,7 @@ def montar_treinadores(rng):
         treinadores.append({
             "id": i,
             "nome": nome_aleatorio(rng),
-            "cidade": rng.choice(CIDADES_BR),
+            "cidade": rng.choice(LOCALIDADES_POKEMON),
             "data_inscricao": inicio + timedelta(days=dias),
             "pontos_ranking": rng.randint(0, 50),  # base inicial; trigger incrementa depois
         })
@@ -433,7 +465,7 @@ def montar_batalhas(rng, treinadores):
         batalhas.append({
             "id": i,
             "data": inicio + timedelta(days=dias),
-            "local": f"Arena de {rng.choice(CIDADES_BR)}",
+            "local": f"Arena de {rng.choice(LOCALIDADES_POKEMON)}",
             "fase": rng.choice(FASES_TORNEIO),
             "id_treinador1": t1["id"],
             "id_treinador2": t2["id"],
