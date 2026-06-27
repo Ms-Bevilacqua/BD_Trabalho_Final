@@ -1,23 +1,20 @@
-#!/usr/bin/env python3
-# =====================================================================
-# gerar_popular.py
-# ---------------------------------------------------------------------
+
+
 # Gera o arquivo scripts/2_popular.sql do Torneio Pokémon.
-#
+
 # COMO FUNCIONA:
-#   1) Tenta buscar dados REAIS na PokeAPI (https://pokeapi.co/api/v2/)
+#   1) Tenta buscar dados na PokeAPI (https://pokeapi.co/api/v2/)
 #      - /pokemon/{id}            -> tipos e estatísticas base
 #      - /pokemon-species/{id}    -> cadeia de evolução (evolution_chain)
 #      - /evolution-chain/{id}    -> para qual espécie cada Pokémon evolui
 #      - /move/{id}               -> golpes (tipo, categoria, poder, etc.)
-#   2) Se a API não estiver acessível (ex.: ambiente sem saída de rede
-#      liberada para pokeapi.co, como o sandbox usado para gerar a
-#      primeira versão deste arquivo), usa automaticamente um dataset
-#      de referência local (DADOS_FALLBACK_POKEMON / _GOLPE), com a
-#      MESMA estrutura de campos que a API retornaria, para que o
-#      restante da geração (treinadores, times, batalhas) continue
-#      funcionando e o banco final tenha os 100+ registros exigidos.
 #
+#   2) Se a API não estiver acessível (ex.: sem acesso a internet ou queda da API, 
+#      usa automaticamente um dataset de referência local (DADOS_FALLBACK_POKEMON / _GOLPE),
+#      com a MESMA estrutura de campos que a API retornaria, para que o
+#      restante da geração (treinadores, times, batalhas) continue funcionando.
+#
+#      
 #   Quando executado em uma máquina com acesso normal à internet, basta
 #   rodar `python3 gerar_popular.py` que ele vai preferir os dados
 #   reais da API automaticamente.
@@ -41,7 +38,7 @@ random.seed(42)  # reprodutibilidade
 POKEAPI_BASE = "https://pokeapi.co/api/v2"
 TIMEOUT = 4
 
-N_POKEMON = 151       # Geração I completa (>= 100 exigidos)
+N_POKEMON = 151       # Geração I completa 
 N_TREINADORES = 120
 N_GOLPES_DESEJADOS = 110
 MIN_TIME_POR_TREINADOR = 3
