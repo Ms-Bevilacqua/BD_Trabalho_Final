@@ -546,14 +546,6 @@ def main():
     ]
 
     sql = []
-    sql.append("-- =====================================================================")
-    sql.append("-- TORNEIO POKÉMON - Artefato 3: População do Banco de Dados")
-    sql.append("-- Gerado automaticamente por gerar_popular.py")
-    sql.append("-- Fonte dos dados de Pokémon/Golpes: PokeAPI (https://pokeapi.co/api/v2/)")
-    sql.append(f"-- Pokemon: {len(linhas_pokemon)} | Golpe: {len(linhas_golpe)} | "
-                f"Treinador: {len(linhas_treinador)} | Time_Treinador: {len(linhas_time)} | "
-                f"Time_Treinador_Golpe: {len(linhas_time_golpe)} | Batalha: {len(linhas_batalha)}")
-    sql.append("-- =====================================================================")
     sql.append("USE pokemon_torneio;")
     sql.append("SET FOREIGN_KEY_CHECKS = 0;\n")
 
