@@ -2,16 +2,16 @@
 -- Torneio Pokémon — Esquema do banco de dados
 -- =============================================================
 
-CREATE DATABASE IF NOT EXISTS `mydb`
+CREATE DATABASE IF NOT EXISTS `Pokemon_Torneio`
   DEFAULT CHARACTER SET utf8mb4
   DEFAULT COLLATE utf8mb4_unicode_ci;
 
-USE `mydb`;
+USE `Pokemon_Torneio`;
 
 SET FOREIGN_KEY_CHECKS = 0;
 
 -- -----------------------------------------------------
--- Table `mydb`.`Treinador`
+-- Table `Pokemon_Torneio`.`Treinador`
 -- -----------------------------------------------------
 CREATE TABLE IF NOT EXISTS `Treinador` (
   `id_treinador`   INT          NOT NULL,
@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS `Treinador` (
 
 
 -- -----------------------------------------------------
--- Table `mydb`.`Pokemon`
+-- Table `Pokemon_Torneio`.`Pokemon`
 -- -----------------------------------------------------
 CREATE TABLE IF NOT EXISTS `Pokemon` (
   `id_especie`      INT         NOT NULL,
@@ -42,17 +42,17 @@ CREATE TABLE IF NOT EXISTS `Pokemon` (
 
 
 -- -----------------------------------------------------
--- Table `mydb`.`Time_Treinador`
+-- Table `Pokemon_Torneio`.`Time_Treinador`
+-- Tabela associativa entre Treinador e Pokemon:
+-- registra quais espécies cada treinador inscreveu
+-- no torneio e em qual posição do time (1 a 6).
 -- -----------------------------------------------------
 CREATE TABLE IF NOT EXISTS `Time_Treinador` (
-  `id_instancia`           INT         NOT NULL,
-  `apelido`                VARCHAR(50) NULL,
-  `nivel`                  INT         NOT NULL,
-  `experiencia`            INT         NOT NULL,
-  `data_captura`           DATE        NOT NULL,
-  `Treinador_id_treinador` INT         NOT NULL,
-  `Pokemon_id_especie`     INT         NOT NULL,
-  PRIMARY KEY (`id_instancia`),
+  `Treinador_id_treinador` INT NOT NULL,
+  `Pokemon_id_especie`     INT NOT NULL,
+  `posicao_no_time`        INT NOT NULL COMMENT 'Posição no time: 1 (líder) a 6',
+  PRIMARY KEY (`Treinador_id_treinador`, `Pokemon_id_especie`),
+  UNIQUE KEY `uq_time_posicao` (`Treinador_id_treinador`, `posicao_no_time`),
   INDEX `fk_Time_Treinador_Treinador_idx` (`Treinador_id_treinador` ASC),
   INDEX `fk_Time_Treinador_Pokemon1_idx`  (`Pokemon_id_especie`     ASC),
   CONSTRAINT `fk_Time_Treinador_Treinador`
@@ -67,7 +67,7 @@ CREATE TABLE IF NOT EXISTS `Time_Treinador` (
 
 
 -- -----------------------------------------------------
--- Table `mydb`.`Golpe`
+-- Table `Pokemon_Torneio`.`Golpe`
 -- -----------------------------------------------------
 CREATE TABLE IF NOT EXISTS `Golpe` (
   `id_golpe`  INT         NOT NULL,
@@ -81,7 +81,7 @@ CREATE TABLE IF NOT EXISTS `Golpe` (
 
 
 -- -----------------------------------------------------
--- Table `mydb`.`Batalha`
+-- Table `Pokemon_Torneio`.`Batalha`
 -- -----------------------------------------------------
 CREATE TABLE IF NOT EXISTS `Batalha` (
   `id_batalha`             INT         NOT NULL,
@@ -110,39 +110,3 @@ CREATE TABLE IF NOT EXISTS `Batalha` (
 
 SET FOREIGN_KEY_CHECKS = 1;
 
-
--- -----------------------------------------------------
--- Trigger: atualiza pontos_ranking após cada batalha
---   +3 pontos para o vencedor
---   +1 ponto para o perdedor
--- -----------------------------------------------------
-DELIMITER $$
-
-CREATE TRIGGER trg_atualiza_ranking_batalha
-AFTER INSERT ON Batalha
-FOR EACH ROW
-BEGIN
-    UPDATE Treinador
-    SET pontos_ranking = pontos_ranking + 3
-    WHERE id_treinador = NEW.id_vencedor;
-
-    UPDATE Treinador
-    SET pontos_ranking = pontos_ranking + 1
-    WHERE id_treinador IN (NEW.Treinador_id_treinador, NEW.Treinador_id_treinador1)
-      AND id_treinador <> NEW.id_vencedor;
-END $$
-
-DELIMITER ;
-
-
--- -----------------------------------------------------
--- View: ranking de treinadores por pontos
--- -----------------------------------------------------
-CREATE OR REPLACE VIEW vw_ranking_treinadores AS
-SELECT
-    id_treinador,
-    nome,
-    cidade,
-    pontos_ranking
-FROM Treinador
-ORDER BY pontos_ranking DESC;

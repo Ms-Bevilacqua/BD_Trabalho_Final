@@ -41,8 +41,8 @@ TIMEOUT = 4
 N_POKEMON = 151       # Geração I completa 
 N_TREINADORES = 120
 N_GOLPES_DESEJADOS = 110
-MIN_TIME_POR_TREINADOR = 3
-MAX_TIME_POR_TREINADOR = 6
+MIN_TIME_POR_TREINADOR = 3  # mínimo de Pokémon inscritos por treinador
+MAX_TIME_POR_TREINADOR = 6  # máximo (time completo)
 # N_BATALHAS removido: o total é calculado automaticamente pela estrutura do torneio
 
 # ---------------------------------------------------------------------
@@ -390,25 +390,20 @@ def montar_treinadores(rng):
 
 
 def montar_times(rng, treinadores, pokemons):
+    """Inscrição dos Pokémon no torneio: cada treinador escolhe
+    entre MIN e MAX espécies, cada uma ocupa uma posição única no time (1 a 6).
+    A chave primária é (Treinador_id_treinador, Pokemon_id_especie)
+    e posicao_no_time é única por treinador."""
     times = []
-    instancia_id = 1
-    apelidos_usados_chance = 0.5
-    inicio = date(2024, 1, 1)
     for t in treinadores:
         qtd = rng.randint(MIN_TIME_POR_TREINADOR, MAX_TIME_POR_TREINADOR)
         especies_escolhidas = rng.sample(pokemons, k=qtd)
-        for especie in especies_escolhidas:
-            dias = rng.randint(0, 500)
+        for posicao, especie in enumerate(especies_escolhidas, start=1):
             times.append({
-                "id": instancia_id,
-                "apelido": (especie["nome"] + "Jr") if rng.random() < apelidos_usados_chance else None,
-                "nivel": rng.randint(5, 80),
-                "experiencia": rng.randint(0, 5000),
-                "data_captura": inicio + timedelta(days=dias),
                 "Treinador_id_treinador": t["id"],
                 "Pokemon_id_especie": especie["id"],
+                "posicao_no_time": posicao,
             })
-            instancia_id += 1
     return times
 
 
@@ -594,10 +589,9 @@ def main():
         for t in treinadores
     ]
     linhas_time = [
-        {"id_instancia": x["id"], "apelido": x["apelido"], "nivel": x["nivel"],
-         "experiencia": x["experiencia"], "data_captura": x["data_captura"],
-         "Treinador_id_treinador": x["Treinador_id_treinador"],
-         "Pokemon_id_especie": x["Pokemon_id_especie"]}
+        {"Treinador_id_treinador": x["Treinador_id_treinador"],
+         "Pokemon_id_especie": x["Pokemon_id_especie"],
+         "posicao_no_time": x["posicao_no_time"]}
         for x in times
     ]
     linhas_batalha = [
@@ -624,10 +618,9 @@ def main():
         ["id_treinador", "nome", "cidade", "data_inscricao", "pontos_ranking"], linhas_treinador))
     sql.append("")
 
-    sql.append("-- Tabela: Time_Treinador (instâncias de Pokémon capturados)")
+    sql.append("-- Tabela: Time_Treinador (Pokémon inscritos por treinador no torneio)")
     sql.append(gerar_inserts("Time_Treinador",
-        ["id_instancia", "apelido", "nivel", "experiencia", "data_captura",
-         "Treinador_id_treinador", "Pokemon_id_especie"], linhas_time))
+        ["Treinador_id_treinador", "Pokemon_id_especie", "posicao_no_time"], linhas_time))
     sql.append("")
 
     sql.append("-- Tabela: Golpe (catálogo de golpes)")
