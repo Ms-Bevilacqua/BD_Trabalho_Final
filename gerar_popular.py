@@ -43,7 +43,7 @@ N_TREINADORES = 120
 N_GOLPES_DESEJADOS = 110
 MIN_TIME_POR_TREINADOR = 3
 MAX_TIME_POR_TREINADOR = 6
-N_BATALHAS = 160
+# N_BATALHAS removido: o total é calculado automaticamente pela estrutura do torneio
 
 # ---------------------------------------------------------------------
 # 1) BUSCA NA POKEAPI (uso real, requer internet liberada para pokeapi.co)
@@ -58,9 +58,10 @@ def testar_pokeapi():
         return False
 
 
+
 def buscar_evolucao_pokeapi(species_id, cache_chain={}):
-    """Usa /pokemon-species e /evolution-chain para achar para qual
-    id de espécie este Pokémon evolui (ou None se for a forma final)."""
+    """Percorre a evolution chain e retorna o id da espécie para qual
+    este Pokémon evolui diretamente, ou None se for forma final."""
     sp = requests.get(f"{POKEAPI_BASE}/pokemon-species/{species_id}", timeout=TIMEOUT).json()
     chain_url = sp["evolution_chain"]["url"]
     if chain_url not in cache_chain:
@@ -70,27 +71,12 @@ def buscar_evolucao_pokeapi(species_id, cache_chain={}):
     def extrair_id(node):
         return int(node["species"]["url"].rstrip("/").split("/")[-1])
 
-    def procurar(node):
-        atual_id = extrair_id(node)
-        proximos = node["evolves_to"]
-        if atual_id == species_id:
-            return extrair_id(proximos[0]) if proximos else None
-        for prox in proximos:
-            achou = procurar(prox)
-            if achou is not None or extrair_id(prox) == species_id:
-                return achou if achou is not None else (
-                    extrair_id(proximos[0]) if node.get("evolves_to") and extrair_id(prox) == species_id and prox.get("evolves_to") else None
-                )
-        return None
-
-    # Busca direta percorrendo a árvore
     def percorrer(node, alvo):
-        atual = extrair_id(node)
-        if atual == alvo:
+        if extrair_id(node) == alvo:
             return extrair_id(node["evolves_to"][0]) if node["evolves_to"] else None
         for filho in node["evolves_to"]:
             res = percorrer(filho, alvo)
-            if res is not None or atual == alvo:
+            if res is not None:
                 return res
         return None
 
@@ -100,28 +86,29 @@ def buscar_evolucao_pokeapi(species_id, cache_chain={}):
 def buscar_pokemon_pokeapi(species_id):
     p = requests.get(f"{POKEAPI_BASE}/pokemon/{species_id}", timeout=TIMEOUT).json()
     tipos = [t["type"]["name"] for t in p["types"]]
-    stats = {s["stat"]["name"]: s["base_stat"] for s in p["stats"]}
+    evolui_para = None
+    try:
+        evolui_para = buscar_evolucao_pokeapi(species_id)
+        # Garante que a evolução existe dentro dos 151 da Gen I
+        if evolui_para is not None and evolui_para > N_POKEMON:
+            evolui_para = None
+    except Exception:
+        pass
     return {
         "id": species_id,
         "nome": p["name"].capitalize(),
-        "tipo1": tipos[0].capitalize(),
-        "tipo2": tipos[1].capitalize() if len(tipos) > 1 else None,
-        "hp": stats.get("hp", 50),
-        "ataque": stats.get("attack", 50),
-        "defesa": stats.get("defense", 50),
-        "velocidade": stats.get("speed", 50),
-        "evolui_para": buscar_evolucao_pokeapi(species_id),
+        "tipo_base": tipos[0].capitalize(),
+        "tipo_secundario": tipos[1].capitalize() if len(tipos) > 1 else None,
+        "evolui_para_id": evolui_para,
     }
 
 
 def buscar_golpe_pokeapi(move_id):
     m = requests.get(f"{POKEAPI_BASE}/move/{move_id}", timeout=TIMEOUT).json()
-    categoria_map = {"physical": "Fisico", "special": "Especial", "status": "Status"}
     return {
         "id": move_id,
         "nome": m["name"].replace("-", " ").title(),
         "tipo": m["type"]["name"].capitalize(),
-        "categoria": categoria_map.get(m["damage_class"]["name"], "Status"),
         "poder": m["power"],
         "precisao": m["accuracy"],
         "pp": m["pp"] or 10,
@@ -231,106 +218,78 @@ _BASE_POKEMON_GEN1 = [
     (150,"Mewtwo","Psychic",None,None),(151,"Mew","Psychic",None,None),
 ]
 
-# Multiplicador de "tier" evolutivo: usado só para gerar stats plausíveis
-def _tier_de(especie_id, mapa_por_id, mapa_evolui_para):
-    """0 = não evolui / forma final acessível direto, 1 = pré-evolução
-    de algo, 2 = pré-pré-evolução. Usado para escalar status base."""
-    profundidade = 0
-    atual = especie_id
-    visitados = set()
-    # conta quantos passos faltam até a forma final
-    while mapa_evolui_para.get(atual) and atual not in visitados:
-        visitados.add(atual)
-        atual = mapa_evolui_para[atual]
-        profundidade += 1
-    return profundidade
-
 
 def montar_fallback_pokemon():
-    mapa_evolui_para = {p[0]: p[4] for p in _BASE_POKEMON_GEN1}
-    # profundidade restante (quantas evoluções estão por vir)
     dados = []
     for (pid, nome, t1, t2, evo) in _BASE_POKEMON_GEN1:
-        passos_restantes = _tier_de(pid, None, mapa_evolui_para)
-        rng = random.Random(1000 + pid)  # determinístico por espécie
-        base = 35 + passos_restantes * 25  # estágio mais avançado herda menos "restante", então somamos diferente abaixo
-        # quanto MAIS evoluções um Pokémon já passou, maior o stat; então
-        # usamos (2 - passos_restantes) como aproximação do estágio atual
-        estagio_atual = 2 - min(passos_restantes, 2)
-        piso = 35 + estagio_atual * 25
         dados.append({
             "id": pid,
-            "nome": nome.replace("-f", " (F)").replace("-m", " (M)").replace("-mime", ". Mime").capitalize()
-                       if False else nome.capitalize(),
-            "tipo1": t1,
-            "tipo2": t2,
-            "hp": piso + rng.randint(0, 30),
-            "ataque": piso + rng.randint(0, 35),
-            "defesa": piso + rng.randint(-5, 30),
-            "velocidade": piso + rng.randint(-10, 30),
-            "evolui_para": evo,
+            "nome": nome.capitalize(),
+            "tipo_base": t1,
+            "tipo_secundario": t2,
+            "evolui_para_id": evo,
         })
     return dados
 
 
-# Golpes de referência (id, nome, tipo, categoria, poder, precisao, pp)
+# Golpes de referência (id, nome, tipo, poder, precisao, pp)
 _GOLPES_REFERENCIA = [
-    (1,"Tackle","Normal","Fisico",40,100,35),(2,"Pound","Normal","Fisico",40,100,35),
-    (3,"Scratch","Normal","Fisico",40,100,35),(4,"Quick Attack","Normal","Fisico",40,100,30),
-    (5,"Double Kick","Fighting","Fisico",30,100,30),(6,"Mega Punch","Normal","Fisico",80,85,20),
-    (7,"Mega Kick","Normal","Fisico",120,75,5),(8,"Karate Chop","Fighting","Fisico",50,100,25),
-    (9,"Body Slam","Normal","Fisico",85,100,15),(10,"Hyper Fang","Normal","Fisico",80,90,15),
-    (11,"Bite","Dark","Fisico",60,100,25),(12,"Strength","Normal","Fisico",80,100,15),
-    (13,"Rock Throw","Rock","Fisico",50,90,15),(14,"Rock Slide","Rock","Fisico",75,90,10),
-    (15,"Dig","Ground","Fisico",80,100,10),(16,"Earthquake","Ground","Fisico",100,100,10),
-    (17,"Wing Attack","Flying","Fisico",60,100,35),(18,"Peck","Flying","Fisico",35,100,35),
-    (19,"Drill Peck","Flying","Fisico",80,100,20),(20,"Fly","Flying","Fisico",90,95,15),
-    (21,"Poison Sting","Poison","Fisico",15,100,35),(22,"Vine Whip","Grass","Fisico",45,100,25),
-    (23,"Razor Leaf","Grass","Fisico",55,95,25),(24,"Crunch","Dark","Fisico",80,100,15),
-    (25,"Ember","Fire","Especial",40,100,25),(26,"Flamethrower","Fire","Especial",90,100,15),
-    (27,"Fire Blast","Fire","Especial",110,85,5),(28,"Water Gun","Water","Especial",40,100,25),
-    (29,"Bubble","Water","Especial",40,100,30),(30,"Hydro Pump","Water","Especial",110,80,5),
-    (31,"Surf","Water","Especial",90,100,15),(32,"Thunder Shock","Electric","Especial",40,100,30),
-    (33,"Thunderbolt","Electric","Especial",90,100,15),(34,"Thunder","Electric","Especial",110,70,10),
-    (35,"Psybeam","Psychic","Especial",65,100,20),(36,"Psychic","Psychic","Especial",90,100,10),
-    (37,"Confusion","Psychic","Especial",50,100,25),(38,"Ice Beam","Ice","Especial",90,100,10),
-    (39,"Blizzard","Ice","Especial",110,70,5),(40,"Aurora Beam","Ice","Especial",65,100,20),
-    (41,"Solar Beam","Grass","Especial",120,100,10),(42,"Petal Dance","Grass","Especial",70,100,20),
-    (43,"Absorb","Grass","Especial",20,100,25),(44,"Mega Drain","Grass","Especial",40,100,15),
-    (45,"Sludge","Poison","Especial",65,100,20),(46,"Acid","Poison","Especial",40,100,30),
-    (47,"Shadow Ball","Ghost","Especial",80,100,15),(48,"Dazzling Gleam","Fairy","Especial",80,100,10),
-    (49,"Hyper Beam","Normal","Especial",150,90,5),(50,"Dream Eater","Psychic","Especial",100,100,15),
-    (51,"Gust","Flying","Especial",40,100,35),(52,"Hypnosis","Psychic","Status",None,60,20),
-    (53,"Thunder Wave","Electric","Status",None,90,20),(54,"Toxic","Poison","Status",None,90,10),
-    (55,"Sleep Powder","Grass","Status",None,75,15),(56,"Stun Spore","Grass","Status",None,75,30),
-    (57,"Leech Seed","Grass","Status",None,90,10),(58,"Growl","Normal","Status",None,100,40),
-    (59,"Tail Whip","Normal","Status",None,100,30),(60,"Defense Curl","Normal","Status",None,None,40),
-    (61,"Withdraw","Water","Status",None,100,40),(62,"Harden","Normal","Status",None,None,30),
-    (63,"Swords Dance","Normal","Status",None,None,30),(64,"Agility","Psychic","Status",None,None,30),
-    (65,"Double Team","Normal","Status",None,None,15),(66,"Recover","Normal","Status",None,None,20),
-    (67,"Rest","Psychic","Status",None,None,10),(68,"Substitute","Normal","Status",None,None,10),
-    (69,"Counter","Fighting","Fisico",100,100,20),(70,"Whirlwind","Normal","Status",None,100,20),
-    (71,"Roar","Normal","Status",None,100,20),(72,"Curse","Ghost","Status",None,None,10),
-    (73,"Glare","Normal","Status",None,90,30),(74,"Spore","Grass","Status",None,100,15),
-    (75,"Amnesia","Psychic","Status",None,None,20),(76,"Barrier","Psychic","Status",None,None,30),
-    (77,"Light Screen","Psychic","Status",None,None,30),(78,"Reflect","Psychic","Status",None,None,20),
-    (79,"Mimic","Normal","Status",None,100,10),(80,"Metronome","Normal","Status",None,None,10),
-    (81,"Self Destruct","Normal","Fisico",200,100,5),(82,"Explosion","Normal","Fisico",250,100,5),
-    (83,"Skull Bash","Normal","Fisico",130,100,10),(84,"Take Down","Normal","Fisico",90,85,20),
-    (85,"Double Edge","Normal","Fisico",120,100,15),(86,"Slam","Normal","Fisico",80,75,20),
-    (87,"Stomp","Normal","Fisico",65,100,20),(88,"Headbutt","Normal","Fisico",70,100,15),
-    (89,"Horn Attack","Normal","Fisico",65,100,25),(90,"Fury Attack","Normal","Fisico",15,85,20),
-    (91,"Sand Attack","Ground","Status",None,100,15),(92,"Bone Club","Ground","Fisico",65,85,20),
-    (93,"Bonemerang","Ground","Fisico",50,90,10),(94,"Clamp","Water","Fisico",35,85,15),
-    (95,"Crabhammer","Water","Fisico",100,90,10),(96,"Waterfall","Water","Fisico",80,100,15),
-    (97,"Leer","Normal","Status",None,100,30),(98,"Smog","Poison","Especial",30,70,20),
-    (99,"Smokescreen","Normal","Status",None,100,20),(100,"Flash","Normal","Status",None,100,20),
-    (101,"Egg Bomb","Normal","Fisico",100,75,10),(102,"Lick","Ghost","Fisico",30,100,30),
-    (103,"Night Shade","Ghost","Especial",None,100,15),(104,"Confuse Ray","Ghost","Status",None,100,10),
-    (105,"Spike Cannon","Normal","Fisico",20,100,15),(106,"Constrict","Normal","Fisico",10,100,35),
-    (107,"Barrage","Normal","Fisico",15,85,20),(108,"Supersonic","Normal","Status",None,55,20),
-    (109,"Disable","Normal","Status",None,100,20),(110,"Acid Armor","Poison","Status",None,None,20),
-    (111,"Iron Tail","Steel","Fisico",100,75,15),(112,"Aerial Ace","Flying","Fisico",60,None,20),
+    (1,"Tackle","Normal",40,100,35),(2,"Pound","Normal",40,100,35),
+    (3,"Scratch","Normal",40,100,35),(4,"Quick Attack","Normal",40,100,30),
+    (5,"Double Kick","Fighting",30,100,30),(6,"Mega Punch","Normal",80,85,20),
+    (7,"Mega Kick","Normal",120,75,5),(8,"Karate Chop","Fighting",50,100,25),
+    (9,"Body Slam","Normal",85,100,15),(10,"Hyper Fang","Normal",80,90,15),
+    (11,"Bite","Dark",60,100,25),(12,"Strength","Normal",80,100,15),
+    (13,"Rock Throw","Rock",50,90,15),(14,"Rock Slide","Rock",75,90,10),
+    (15,"Dig","Ground",80,100,10),(16,"Earthquake","Ground",100,100,10),
+    (17,"Wing Attack","Flying",60,100,35),(18,"Peck","Flying",35,100,35),
+    (19,"Drill Peck","Flying",80,100,20),(20,"Fly","Flying",90,95,15),
+    (21,"Poison Sting","Poison",15,100,35),(22,"Vine Whip","Grass",45,100,25),
+    (23,"Razor Leaf","Grass",55,95,25),(24,"Crunch","Dark",80,100,15),
+    (25,"Ember","Fire",40,100,25),(26,"Flamethrower","Fire",90,100,15),
+    (27,"Fire Blast","Fire",110,85,5),(28,"Water Gun","Water",40,100,25),
+    (29,"Bubble","Water",40,100,30),(30,"Hydro Pump","Water",110,80,5),
+    (31,"Surf","Water",90,100,15),(32,"Thunder Shock","Electric",40,100,30),
+    (33,"Thunderbolt","Electric",90,100,15),(34,"Thunder","Electric",110,70,10),
+    (35,"Psybeam","Psychic",65,100,20),(36,"Psychic","Psychic",90,100,10),
+    (37,"Confusion","Psychic",50,100,25),(38,"Ice Beam","Ice",90,100,10),
+    (39,"Blizzard","Ice",110,70,5),(40,"Aurora Beam","Ice",65,100,20),
+    (41,"Solar Beam","Grass",120,100,10),(42,"Petal Dance","Grass",70,100,20),
+    (43,"Absorb","Grass",20,100,25),(44,"Mega Drain","Grass",40,100,15),
+    (45,"Sludge","Poison",65,100,20),(46,"Acid","Poison",40,100,30),
+    (47,"Shadow Ball","Ghost",80,100,15),(48,"Dazzling Gleam","Fairy",80,100,10),
+    (49,"Hyper Beam","Normal",150,90,5),(50,"Dream Eater","Psychic",100,100,15),
+    (51,"Gust","Flying",40,100,35),(52,"Hypnosis","Psychic",None,60,20),
+    (53,"Thunder Wave","Electric",None,90,20),(54,"Toxic","Poison",None,90,10),
+    (55,"Sleep Powder","Grass",None,75,15),(56,"Stun Spore","Grass",None,75,30),
+    (57,"Leech Seed","Grass",None,90,10),(58,"Growl","Normal",None,100,40),
+    (59,"Tail Whip","Normal",None,100,30),(60,"Defense Curl","Normal",None,None,40),
+    (61,"Withdraw","Water",None,100,40),(62,"Harden","Normal",None,None,30),
+    (63,"Swords Dance","Normal",None,None,30),(64,"Agility","Psychic",None,None,30),
+    (65,"Double Team","Normal",None,None,15),(66,"Recover","Normal",None,None,20),
+    (67,"Rest","Psychic",None,None,10),(68,"Substitute","Normal",None,None,10),
+    (69,"Counter","Fighting",100,100,20),(70,"Whirlwind","Normal",None,100,20),
+    (71,"Roar","Normal",None,100,20),(72,"Curse","Ghost",None,None,10),
+    (73,"Glare","Normal",None,90,30),(74,"Spore","Grass",None,100,15),
+    (75,"Amnesia","Psychic",None,None,20),(76,"Barrier","Psychic",None,None,30),
+    (77,"Light Screen","Psychic",None,None,30),(78,"Reflect","Psychic",None,None,20),
+    (79,"Mimic","Normal",None,100,10),(80,"Metronome","Normal",None,None,10),
+    (81,"Self Destruct","Normal",200,100,5),(82,"Explosion","Normal",250,100,5),
+    (83,"Skull Bash","Normal",130,100,10),(84,"Take Down","Normal",90,85,20),
+    (85,"Double Edge","Normal",120,100,15),(86,"Slam","Normal",80,75,20),
+    (87,"Stomp","Normal",65,100,20),(88,"Headbutt","Normal",70,100,15),
+    (89,"Horn Attack","Normal",65,100,25),(90,"Fury Attack","Normal",15,85,20),
+    (91,"Sand Attack","Ground",None,100,15),(92,"Bone Club","Ground",65,85,20),
+    (93,"Bonemerang","Ground",50,90,10),(94,"Clamp","Water",35,85,15),
+    (95,"Crabhammer","Water",100,90,10),(96,"Waterfall","Water",80,100,15),
+    (97,"Leer","Normal",None,100,30),(98,"Smog","Poison",30,70,20),
+    (99,"Smokescreen","Normal",None,100,20),(100,"Flash","Normal",None,100,20),
+    (101,"Egg Bomb","Normal",100,75,10),(102,"Lick","Ghost",30,100,30),
+    (103,"Night Shade","Ghost",None,100,15),(104,"Confuse Ray","Ghost",None,100,10),
+    (105,"Spike Cannon","Normal",20,100,15),(106,"Constrict","Normal",10,100,35),
+    (107,"Barrage","Normal",15,85,20),(108,"Supersonic","Normal",None,55,20),
+    (109,"Disable","Normal",None,100,20),(110,"Acid Armor","Poison",None,None,20),
+    (111,"Iron Tail","Steel",100,75,15),(112,"Aerial Ace","Flying",60,None,20),
 ]
 
 
@@ -359,8 +318,8 @@ def montar_golpes():
             i += 1
         return golpes
     return [
-        {"id": g[0], "nome": g[1], "tipo": g[2], "categoria": g[3],
-         "poder": g[4], "precisao": g[5], "pp": g[6]}
+        {"id": g[0], "nome": g[1], "tipo": g[2],
+         "poder": g[3], "precisao": g[4], "pp": g[5]}
         for g in _GOLPES_REFERENCIA
     ]
 
@@ -393,7 +352,15 @@ def montar_localidades():
 
 LOCALIDADES_POKEMON = montar_localidades()
 
-FASES_TORNEIO = ["Fase de Grupos", "Oitavas de Final", "Quartas de Final", "Semifinal", "Final"]
+# Fases do chaveamento eliminatório (após fase de grupos)
+# Com 120 treinadores: 16 grupos de ~7-8 → 32 classificados → Oitavas até Final
+FASES_ELIMINATORIAS = [
+    ("Oitavas de Final", 16),  # 16 batalhas, 32 → 16
+    ("Quartas de Final",  8),  #  8 batalhas, 16 →  8
+    ("Semifinal",         4),  #  4 batalhas,  8 →  4
+    ("Terceiro Lugar",    1),  #  1 batalha,   disputa 3º/4º
+    ("Final",             1),  #  1 batalha,   só 1 vencedor
+]
 
 
 def nome_aleatorio(rng):
@@ -417,7 +384,7 @@ def montar_treinadores(rng):
             "nome": nome_aleatorio(rng),
             "cidade": rng.choice(LOCALIDADES_POKEMON),
             "data_inscricao": inicio + timedelta(days=dias),
-            "pontos_ranking": rng.randint(0, 50),  # base inicial; trigger incrementa depois
+            "pontos_ranking": 0,  # sempre zero: o trigger trg_atualiza_ranking_batalha acumula +3 ao vencedor e +1 ao perdedor a cada batalha inserida
         })
     return treinadores
 
@@ -438,39 +405,138 @@ def montar_times(rng, treinadores, pokemons):
                 "nivel": rng.randint(5, 80),
                 "experiencia": rng.randint(0, 5000),
                 "data_captura": inicio + timedelta(days=dias),
-                "id_treinador": t["id"],
-                "id_especie": especie["id"],
+                "Treinador_id_treinador": t["id"],
+                "Pokemon_id_especie": especie["id"],
             })
             instancia_id += 1
     return times
 
 
-def montar_time_golpes(rng, times, golpes):
-    relacoes = []
-    for instancia in times:
-        qtd = rng.randint(2, 4)
-        escolhidos = rng.sample(golpes, k=min(qtd, len(golpes)))
-        for g in escolhidos:
-            relacoes.append({"id_instancia": instancia["id"], "id_golpe": g["id"]})
-    return relacoes
+def montar_golpes_por_instancia(rng, times, golpes):
+    """Golpes são um catálogo independente — sem FK para Time_Treinador."""
+    return golpes
 
 
 def montar_batalhas(rng, treinadores):
+    """Gera batalhas respeitando a estrutura real de um torneio único:
+
+    1) Fase de Grupos: treinadores divididos em grupos, cada um joga
+       exatamente 2 partidas dentro do seu grupo. O vencedor de cada
+       grupo (melhor campanha) avança para o chaveamento eliminatório.
+
+    2) Chaveamento eliminatório: Oitavas → Quartas → Semifinal →
+       Terceiro Lugar → Final. Cada fase tem exatamente o número certo
+       de batalhas; "Final" ocorre UMA única vez.
+    """
     batalhas = []
-    inicio = date(2024, 6, 1)
-    for i in range(1, N_BATALHAS + 1):
-        t1, t2 = rng.sample(treinadores, k=2)
-        vencedor = rng.choice([t1["id"], t2["id"], None]) if rng.random() < 0.08 else rng.choice([t1["id"], t2["id"]])
-        dias = rng.randint(0, 200)
-        batalhas.append({
-            "id": i,
-            "data": inicio + timedelta(days=dias),
-            "local": f"Arena de {rng.choice(LOCALIDADES_POKEMON)}",
-            "fase": rng.choice(FASES_TORNEIO),
-            "id_treinador1": t1["id"],
-            "id_treinador2": t2["id"],
-            "id_vencedor": vencedor,
-        })
+    bid = 1  # id sequencial das batalhas
+
+    # ── 1) FASE DE GRUPOS ─────────────────────────────────────────────
+    # Dividir os 120 treinadores em 16 grupos (8 com 8 e 8 com 7)
+    shuffled = treinadores[:]
+    rng.shuffle(shuffled)
+    n_grupos = 16
+    grupos = [[] for _ in range(n_grupos)]
+    for idx, t in enumerate(shuffled):
+        grupos[idx % n_grupos].append(t)
+
+    # Data base da fase de grupos: começa em fevereiro
+    data_grupos = date(2025, 2, 1)
+    classificados = []  # um vencedor por grupo avança
+
+    for grupo in grupos:
+        # Cada treinador do grupo joga contra 2 adversários diferentes
+        adversarios = grupo[:]
+        rng.shuffle(adversarios)
+        jogados = set()   # pares já jogados (frozenset de ids)
+        pontos = {t["id"]: 0 for t in grupo}
+
+        for t in grupo:
+            oponentes_possiveis = [
+                x for x in grupo
+                if x["id"] != t["id"]
+                and frozenset((t["id"], x["id"])) not in jogados
+            ]
+            # Cada treinador joga no máximo 2 partidas no grupo
+            ja_jogou = sum(1 for (a, b) in jogados if t["id"] in (a, b))
+            for oponente in oponentes_possiveis:
+                if ja_jogou >= 2:
+                    break
+                ja_jogou_oponente = sum(1 for (a, b) in jogados if oponente["id"] in (a, b))
+                if ja_jogou_oponente >= 2:
+                    continue
+                par = frozenset((t["id"], oponente["id"]))
+                jogados.add(par)
+                ja_jogou += 1
+                vencedor_id = rng.choice([t["id"], oponente["id"]])
+                pontos[vencedor_id] += 3
+                dias = rng.randint(0, 28)
+                batalhas.append({
+                    "id": bid,
+                    "data": data_grupos + timedelta(days=dias),
+                    "fase": "Fase de Grupos",
+                    "Treinador_id_treinador": t["id"],
+                    "Treinador_id_treinador1": oponente["id"],
+                    "id_vencedor": vencedor_id,
+                })
+                bid += 1
+
+        # Classifica o treinador com mais pontos do grupo
+        lider = max(grupo, key=lambda t: pontos[t["id"]])
+        classificados.append(lider)
+
+    # ── 2) CHAVEAMENTO ELIMINATÓRIO ────────────────────────────────────
+    # classificados tem exatamente 16 → entra em Oitavas de Final
+    atual_rodada = classificados[:]
+    rng.shuffle(atual_rodada)
+
+    # Datas progressivas por fase (3 semanas de intervalo)
+    data_fase = date(2025, 3, 15)
+
+    for (nome_fase, n_batalhas_fase) in FASES_ELIMINATORIAS:
+        if nome_fase == "Terceiro Lugar":
+            # Os dois perdedores da Semifinal disputam o 3º lugar
+            # (guardados em semifinalistas_eliminados)
+            t1, t2 = semifinalistas_eliminados
+            vencedor_id = rng.choice([t1["id"], t2["id"]])
+            batalhas.append({
+                "id": bid,
+                "data": data_fase,
+                "fase": nome_fase,
+                "Treinador_id_treinador": t1["id"],
+                "Treinador_id_treinador1": t2["id"],
+                "id_vencedor": vencedor_id,
+            })
+            bid += 1
+            data_fase += timedelta(weeks=1)
+            continue
+
+        proxima_rodada = []
+        semifinalistas_eliminados = []  # só usado após a Semifinal
+
+        for i in range(0, len(atual_rodada) - 1, 2):
+            t1 = atual_rodada[i]
+            t2 = atual_rodada[i + 1]
+            vencedor_id = rng.choice([t1["id"], t2["id"]])
+            perdedor = t2 if vencedor_id == t1["id"] else t1
+            dias = rng.randint(0, 6)
+            batalhas.append({
+                "id": bid,
+                "data": data_fase + timedelta(days=dias),
+                "fase": nome_fase,
+                "Treinador_id_treinador": t1["id"],
+                "Treinador_id_treinador1": t2["id"],
+                "id_vencedor": vencedor_id,
+            })
+            bid += 1
+            vencedor_obj = t1 if vencedor_id == t1["id"] else t2
+            proxima_rodada.append(vencedor_obj)
+            if nome_fase == "Semifinal":
+                semifinalistas_eliminados.append(perdedor)
+
+        atual_rodada = proxima_rodada
+        data_fase += timedelta(weeks=3)
+
     return batalhas
 
 
@@ -505,21 +571,20 @@ def main():
     rng = random.Random(7)
 
     pokemons = montar_pokemons()
-    golpes = montar_golpes()
+    golpes_base = montar_golpes()
     treinadores = montar_treinadores(rng)
     times = montar_times(rng, treinadores, pokemons)
-    time_golpes = montar_time_golpes(rng, times, golpes)
+    golpes = montar_golpes_por_instancia(rng, times, golpes_base)
     batalhas = montar_batalhas(rng, treinadores)
 
     linhas_pokemon = [
-        {"id_especie": p["id"], "nome_especie": p["nome"], "tipo_base": p["tipo1"],
-         "tipo_secundario": p["tipo2"], "hp_base": p["hp"], "ataque_base": p["ataque"],
-         "defesa_base": p["defesa"], "velocidade_base": p["velocidade"],
-         "evolui_para_id": p["evolui_para"]}
+        {"id_especie": p["id"], "nome_especie": p["nome"],
+         "tipo_base": p["tipo_base"], "tipo_secundario": p["tipo_secundario"],
+         "evolui_para_id": p["evolui_para_id"]}
         for p in pokemons
     ]
     linhas_golpe = [
-        {"id_golpe": g["id"], "nome": g["nome"], "tipo": g["tipo"], "categoria": g["categoria"],
+        {"id_golpe": g["id"], "nome": g["nome"], "tipo": g["tipo"],
          "poder": g["poder"], "precisao": g["precisao"], "pp_maximo": g["pp"]}
         for g in golpes
     ]
@@ -531,55 +596,49 @@ def main():
     linhas_time = [
         {"id_instancia": x["id"], "apelido": x["apelido"], "nivel": x["nivel"],
          "experiencia": x["experiencia"], "data_captura": x["data_captura"],
-         "id_treinador": x["id_treinador"], "id_especie": x["id_especie"]}
+         "Treinador_id_treinador": x["Treinador_id_treinador"],
+         "Pokemon_id_especie": x["Pokemon_id_especie"]}
         for x in times
     ]
-    linhas_time_golpe = [
-        {"id_instancia": r["id_instancia"], "id_golpe": r["id_golpe"]}
-        for r in time_golpes
-    ]
     linhas_batalha = [
-        {"id_batalha": b["id"], "data_batalha": b["data"], "local_batalha": b["local"],
-         "fase_torneio": b["fase"], "id_treinador1": b["id_treinador1"],
-         "id_treinador2": b["id_treinador2"], "id_vencedor": b["id_vencedor"]}
+        {"id_batalha": b["id"], "data_batalha": b["data"],
+         "fase_torneio": b["fase"],
+         "Treinador_id_treinador": b["Treinador_id_treinador"],
+         "Treinador_id_treinador1": b["Treinador_id_treinador1"],
+         "id_vencedor": b["id_vencedor"]}
         for b in batalhas
     ]
 
     sql = []
-    sql.append("USE pokemon_torneio;")
+    sql.append("USE mydb;")
     sql.append("SET FOREIGN_KEY_CHECKS = 0;\n")
 
     sql.append("-- Tabela: Pokemon (catálogo de espécies)")
     sql.append(gerar_inserts("Pokemon",
-        ["id_especie","nome_especie","tipo_base","tipo_secundario","hp_base",
-         "ataque_base","defesa_base","velocidade_base","evolui_para_id"], linhas_pokemon))
-    sql.append("")
-
-    sql.append("-- Tabela: Golpe (catálogo de habilidades)")
-    sql.append(gerar_inserts("Golpe",
-        ["id_golpe","nome","tipo","categoria","poder","precisao","pp_maximo"], linhas_golpe))
+        ["id_especie", "nome_especie", "tipo_base", "tipo_secundario", "evolui_para_id"],
+        linhas_pokemon))
     sql.append("")
 
     sql.append("-- Tabela: Treinador")
     sql.append(gerar_inserts("Treinador",
-        ["id_treinador","nome","cidade","data_inscricao","pontos_ranking"], linhas_treinador))
+        ["id_treinador", "nome", "cidade", "data_inscricao", "pontos_ranking"], linhas_treinador))
     sql.append("")
 
     sql.append("-- Tabela: Time_Treinador (instâncias de Pokémon capturados)")
     sql.append(gerar_inserts("Time_Treinador",
-        ["id_instancia","apelido","nivel","experiencia","data_captura",
-         "id_treinador","id_especie"], linhas_time))
+        ["id_instancia", "apelido", "nivel", "experiencia", "data_captura",
+         "Treinador_id_treinador", "Pokemon_id_especie"], linhas_time))
     sql.append("")
 
-    sql.append("-- Tabela: Time_Treinador_Golpe (golpes conhecidos por cada instância)")
-    sql.append(gerar_inserts("Time_Treinador_Golpe",
-        ["id_instancia","id_golpe"], linhas_time_golpe))
+    sql.append("-- Tabela: Golpe (catálogo de golpes)")
+    sql.append(gerar_inserts("Golpe",
+        ["id_golpe", "nome", "tipo", "poder", "precisao", "pp_maximo"], linhas_golpe))
     sql.append("")
 
     sql.append("-- Tabela: Batalha (histórico do torneio)")
     sql.append(gerar_inserts("Batalha",
-        ["id_batalha","data_batalha","local_batalha","fase_torneio",
-         "id_treinador1","id_treinador2","id_vencedor"], linhas_batalha))
+        ["id_batalha", "data_batalha", "fase_torneio",
+         "Treinador_id_treinador", "Treinador_id_treinador1", "id_vencedor"], linhas_batalha))
     sql.append("")
     sql.append("SET FOREIGN_KEY_CHECKS = 1;")
 
@@ -588,12 +647,11 @@ def main():
         f.write("\n".join(sql) + "\n")
 
     print("\nResumo de linhas geradas por tabela:")
-    print(f"  Pokemon:              {len(linhas_pokemon)}")
-    print(f"  Golpe:                {len(linhas_golpe)}")
-    print(f"  Treinador:            {len(linhas_treinador)}")
-    print(f"  Time_Treinador:       {len(linhas_time)}")
-    print(f"  Time_Treinador_Golpe: {len(linhas_time_golpe)}")
-    print(f"  Batalha:              {len(linhas_batalha)}")
+    print(f"  Pokemon:        {len(linhas_pokemon)}")
+    print(f"  Treinador:      {len(linhas_treinador)}")
+    print(f"  Time_Treinador: {len(linhas_time)}")
+    print(f"  Golpe:          {len(linhas_golpe)}")
+    print(f"  Batalha:        {len(linhas_batalha)}")
     print("\nArquivo gerado: 2_popular.sql")
 
 
