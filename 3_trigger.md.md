@@ -1,4 +1,8 @@
-# Regras de Negócio do Trigger 1 : Atualizar Ranking Após Batalha
+
+
+# Neste arquivo contem explicação da regra de negocio dos seguintes gatilho ;
+# Trigger 1 : Atualizar Ranking Após Batalha
+# Trigger 2 : Limite maximo participantes
 
 ## 1. Descrição 
 A tabela `Batalha` registra cada confronto realizado no torneio, armazenando informações como:
@@ -100,6 +104,119 @@ Essa regra evita situações como:
 - vencedor sem receber pontos;
 - perdedor sem receber pontuação de participação;
 - pontuação digitada incorretamente pelo usuário.
+
+---
+
+# Regras de Negócio do Trigger 2 : Limite Maximo Pokemon 
+
+## 1. Contexto do Sistema
+
+O banco de dados representa o gerenciamento de um torneio Pokémon. Nesse sistema, cada treinador inscrito no campeonato pode possuir Pokémons cadastrados em seu time por meio da tabela `Time_Treinador`.
+
+A tabela `Time_Treinador` representa a relação entre um treinador e os Pokémons que ele possui. Ela armazena informações como:
+
+- ID da instância do Pokémon;
+- apelido do Pokémon;
+- nível;
+- experiência;
+- data de captura;
+- ID do treinador;
+- ID da espécie do Pokémon.
+
+Como o torneio segue uma regra comum do universo Pokémon, cada treinador deve possuir no máximo 6 Pokémons em seu time.
+
+---
+
+## 2. Trigger Relacionada
+
+A trigger responsável por essa regra é:
+
+```sql
+DELIMITER $$
+
+CREATE TRIGGER trg_limite_6_pokemons
+BEFORE INSERT ON Time_Treinador
+FOR EACH ROW
+BEGIN
+  DECLARE qtd_pokemons INT;
+
+  SELECT COUNT(*)
+  INTO qtd_pokemons
+  FROM Time_Treinador
+  WHERE Treinador_id_treinador = NEW.Treinador_id_treinador;
+
+  IF qtd_pokemons >= 6 THEN
+    SIGNAL SQLSTATE '45000'
+    SET MESSAGE_TEXT = 'Um treinador não pode ter mais de 6 Pokémons no time.';
+  END IF;
+END $$
+
+DELIMITER ;
+```
+
+---
+
+## 3. Objetivo 
+
+O objetivo da trigger é impedir que um treinador tenha mais de 6 Pokémons cadastrados em seu time.
+
+Essa validação é feita automaticamente antes da inserção de um novo registro na tabela `Time_Treinador`.
+
+Caso o treinador já possua 6 Pokémons cadastrados, o banco de dados bloqueia a operação e exibe uma mensagem de erro.
+
+---
+
+## 4. Regras de Negócio que Demandam 
+
+### RN01 Um treinador pode possuir no máximo 6 Pokémons no time
+
+Cada treinador participante do torneio deve respeitar o limite máximo de 6 Pokémons cadastrados.
+
+Essa regra evita que um treinador tenha vantagem indevida sobre os demais competidores.
+
+---
+
+### RN02 O limite deve ser verificado antes do cadastro de um novo Pokémon
+
+Antes de inserir um novo Pokémon na tabela `Time_Treinador`, o sistema deve verificar quantos Pokémons o treinador já possui.
+
+Se o treinador já tiver 6 Pokémons, a nova inserção não deve ser permitida.
+
+---
+
+### RN03 A regra deve ser aplicada automaticamente pelo banco de dados
+
+A validação não deve depender apenas da aplicação ou do usuário.
+
+Mesmo que alguém tente cadastrar um Pokémon diretamente pelo MySQL, o banco deve impedir a inserção caso o limite seja ultrapassado.
+
+---
+
+## 5. Funcionamento 
+
+A trigger é executada antes de cada inserção na tabela `Time_Treinador`.
+
+Primeiro, ela conta quantos Pokémons já estão cadastrados para o treinador informado:
+
+```sql
+SELECT COUNT(*)
+INTO qtd_pokemons
+FROM Time_Treinador
+WHERE Treinador_id_treinador = NEW.Treinador_id_treinador;
+```
+
+Depois, verifica se essa quantidade é maior ou igual a 6:
+
+```sql
+IF qtd_pokemons >= 6 THEN
+```
+
+Se o limite já tiver sido atingido, a operação é bloqueada com o comando:
+
+```sql
+SIGNAL SQLSTATE '45000'
+SET MESSAGE_TEXT = 'Um treinador não pode ter mais de 6 Pokémons no time.';
+```
 
 ---
 

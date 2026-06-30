@@ -1,5 +1,3 @@
-
-
 # Gera o arquivo scripts/2_popular.sql do Torneio Pokémon.
 
 # COMO FUNCIONA:
@@ -391,18 +389,16 @@ def montar_treinadores(rng):
 
 def montar_times(rng, treinadores, pokemons):
     """Inscrição dos Pokémon no torneio: cada treinador escolhe
-    entre MIN e MAX espécies, cada uma ocupa uma posição única no time (1 a 6).
-    A chave primária é (Treinador_id_treinador, Pokemon_id_especie)
-    e posicao_no_time é única por treinador."""
+    entre MIN e MAX espécies para o seu time.
+    A chave primária é (Treinador_id_treinador, Pokemon_id_especie)."""
     times = []
     for t in treinadores:
         qtd = rng.randint(MIN_TIME_POR_TREINADOR, MAX_TIME_POR_TREINADOR)
         especies_escolhidas = rng.sample(pokemons, k=qtd)
-        for posicao, especie in enumerate(especies_escolhidas, start=1):
+        for especie in especies_escolhidas:
             times.append({
                 "Treinador_id_treinador": t["id"],
                 "Pokemon_id_especie": especie["id"],
-                "posicao_no_time": posicao,
             })
     return times
 
@@ -590,8 +586,7 @@ def main():
     ]
     linhas_time = [
         {"Treinador_id_treinador": x["Treinador_id_treinador"],
-         "Pokemon_id_especie": x["Pokemon_id_especie"],
-         "posicao_no_time": x["posicao_no_time"]}
+         "Pokemon_id_especie": x["Pokemon_id_especie"]}
         for x in times
     ]
     linhas_batalha = [
@@ -620,7 +615,7 @@ def main():
 
     sql.append("-- Tabela: Time_Treinador (Pokémon inscritos por treinador no torneio)")
     sql.append(gerar_inserts("Time_Treinador",
-        ["Treinador_id_treinador", "Pokemon_id_especie", "posicao_no_time"], linhas_time))
+        ["Treinador_id_treinador", "Pokemon_id_especie"], linhas_time))
     sql.append("")
 
     sql.append("-- Tabela: Golpe (catálogo de golpes)")

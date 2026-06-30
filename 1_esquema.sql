@@ -45,14 +45,12 @@ CREATE TABLE IF NOT EXISTS `Pokemon` (
 -- Table `Pokemon_Torneio`.`Time_Treinador`
 -- Tabela associativa entre Treinador e Pokemon:
 -- registra quais espécies cada treinador inscreveu
--- no torneio e em qual posição do time (1 a 6).
+-- no torneio.
 -- -----------------------------------------------------
 CREATE TABLE IF NOT EXISTS `Time_Treinador` (
   `Treinador_id_treinador` INT NOT NULL,
   `Pokemon_id_especie`     INT NOT NULL,
-  `posicao_no_time`        INT NOT NULL COMMENT 'Posição no time: 1 (líder) a 6',
   PRIMARY KEY (`Treinador_id_treinador`, `Pokemon_id_especie`),
-  UNIQUE KEY `uq_time_posicao` (`Treinador_id_treinador`, `posicao_no_time`),
   INDEX `fk_Time_Treinador_Treinador_idx` (`Treinador_id_treinador` ASC),
   INDEX `fk_Time_Treinador_Pokemon1_idx`  (`Pokemon_id_especie`     ASC),
   CONSTRAINT `fk_Time_Treinador_Treinador`
@@ -109,4 +107,3 @@ CREATE TABLE IF NOT EXISTS `Batalha` (
 ) ENGINE = InnoDB;
 
 SET FOREIGN_KEY_CHECKS = 1;
-
