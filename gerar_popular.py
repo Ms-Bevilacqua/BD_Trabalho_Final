@@ -41,6 +41,8 @@ N_TREINADORES = 120
 N_GOLPES_DESEJADOS = 110
 MIN_TIME_POR_TREINADOR = 3  # mínimo de Pokémon inscritos por treinador
 MAX_TIME_POR_TREINADOR = 6  # máximo (time completo)
+MIN_GOLPES_POR_POKEMON = 4  # mínimo de golpes que cada espécie pode aprender
+MAX_GOLPES_POR_POKEMON = 8  # máximo de golpes que cada espécie pode aprender
 # N_BATALHAS removido: o total é calculado automaticamente pela estrutura do torneio
 
 # ---------------------------------------------------------------------
@@ -92,12 +94,19 @@ def buscar_pokemon_pokeapi(species_id):
             evolui_para = None
     except Exception:
         pass
+    golpes_ids = []
+    for m in p.get("moves", []):
+        try:
+            golpes_ids.append(int(m["move"]["url"].rstrip("/").split("/")[-1]))
+        except (KeyError, ValueError, IndexError):
+            continue
     return {
         "id": species_id,
         "nome": p["name"].capitalize(),
         "tipo_base": tipos[0].capitalize(),
         "tipo_secundario": tipos[1].capitalize() if len(tipos) > 1 else None,
         "evolui_para_id": evolui_para,
+        "golpes_ids": golpes_ids,  # learnset real, usado por montar_pokemon_golpe
     }
 
 
@@ -226,6 +235,7 @@ def montar_fallback_pokemon():
             "tipo_base": t1,
             "tipo_secundario": t2,
             "evolui_para_id": evo,
+            "golpes_ids": [],  # sem learnset real offline; montar_pokemon_golpe sorteia
         })
     return dados
 
@@ -408,6 +418,41 @@ def montar_golpes_por_instancia(rng, times, golpes):
     return golpes
 
 
+def montar_pokemon_golpe(rng, pokemons, golpes):
+    """Relação N:N entre Pokemon e Golpe: quais golpes cada espécie
+    é capaz de aprender.
+
+    Quando os dados vieram da PokeAPI, cada Pokémon já carrega seu
+    learnset real em 'golpes_ids' (ver buscar_pokemon_pokeapi); aqui
+    isso é restrito aos golpes que existem no nosso catálogo (golpes)
+    e, se necessário, completado aleatoriamente até o mínimo desejado.
+    No fallback offline 'golpes_ids' vem vazio, então a relação é
+    sorteada por completo — mesma lógica usada em montar_times."""
+    catalogo_ids = [g["id"] for g in golpes]
+    relacoes = []
+
+    for p in pokemons:
+        qtd_alvo = rng.randint(MIN_GOLPES_POR_POKEMON, MAX_GOLPES_POR_POKEMON)
+
+        reais = [gid for gid in p.get("golpes_ids", []) if gid in catalogo_ids]
+        reais = list(dict.fromkeys(reais))  # remove duplicados, preserva ordem
+        rng.shuffle(reais)
+        escolhidos = reais[:qtd_alvo]
+
+        if len(escolhidos) < qtd_alvo:
+            restantes = [gid for gid in catalogo_ids if gid not in escolhidos]
+            faltam = min(qtd_alvo - len(escolhidos), len(restantes))
+            escolhidos += rng.sample(restantes, k=faltam)
+
+        for gid in escolhidos:
+            relacoes.append({
+                "Pokemon_id_especie": p["id"],
+                "Golpe_id_golpe": gid,
+            })
+
+    return relacoes
+
+
 def montar_batalhas(rng, treinadores):
     """Gera batalhas respeitando a estrutura real de um torneio único:
 
@@ -566,6 +611,7 @@ def main():
     treinadores = montar_treinadores(rng)
     times = montar_times(rng, treinadores, pokemons)
     golpes = montar_golpes_por_instancia(rng, times, golpes_base)
+    pokemon_golpe = montar_pokemon_golpe(rng, pokemons, golpes)
     batalhas = montar_batalhas(rng, treinadores)
 
     linhas_pokemon = [
@@ -589,6 +635,11 @@ def main():
          "Pokemon_id_especie": x["Pokemon_id_especie"]}
         for x in times
     ]
+    linhas_pokemon_golpe = [
+        {"Pokemon_id_especie": r["Pokemon_id_especie"],
+         "Golpe_id_golpe": r["Golpe_id_golpe"]}
+        for r in pokemon_golpe
+    ]
     linhas_batalha = [
         {"id_batalha": b["id"], "data_batalha": b["data"],
          "fase_torneio": b["fase"],
@@ -599,7 +650,7 @@ def main():
     ]
 
     sql = []
-    sql.append("USE mydb;")
+    sql.append("USE `Pokemon_Torneio`;")
     sql.append("SET FOREIGN_KEY_CHECKS = 0;\n")
 
     sql.append("-- Tabela: Pokemon (catálogo de espécies)")
@@ -623,6 +674,11 @@ def main():
         ["id_golpe", "nome", "tipo", "poder", "precisao", "pp_maximo"], linhas_golpe))
     sql.append("")
 
+    sql.append("-- Tabela: Pokemon_Golpe (golpes que cada espécie pode aprender)")
+    sql.append(gerar_inserts("Pokemon_Golpe",
+        ["Pokemon_id_especie", "Golpe_id_golpe"], linhas_pokemon_golpe))
+    sql.append("")
+
     sql.append("-- Tabela: Batalha (histórico do torneio)")
     sql.append(gerar_inserts("Batalha",
         ["id_batalha", "data_batalha", "fase_torneio",
@@ -639,6 +695,7 @@ def main():
     print(f"  Treinador:      {len(linhas_treinador)}")
     print(f"  Time_Treinador: {len(linhas_time)}")
     print(f"  Golpe:          {len(linhas_golpe)}")
+    print(f"  Pokemon_Golpe:  {len(linhas_pokemon_golpe)}")
     print(f"  Batalha:        {len(linhas_batalha)}")
     print("\nArquivo gerado: 2_popular.sql")
 

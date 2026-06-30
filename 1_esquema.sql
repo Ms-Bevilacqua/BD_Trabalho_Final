@@ -79,6 +79,28 @@ CREATE TABLE IF NOT EXISTS `Golpe` (
 
 
 -- -----------------------------------------------------
+-- Table `Pokemon_Torneio`.`Pokemon_Golpe`
+-- Tabela associativa entre Pokemon e Golpe:
+-- registra quais golpes cada espécie é capaz de aprender.
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS `Pokemon_Golpe` (
+  `Pokemon_id_especie` INT NOT NULL,
+  `Golpe_id_golpe`     INT NOT NULL,
+  PRIMARY KEY (`Pokemon_id_especie`, `Golpe_id_golpe`),
+  INDEX `fk_Pokemon_Golpe_Pokemon_idx` (`Pokemon_id_especie` ASC),
+  INDEX `fk_Pokemon_Golpe_Golpe_idx`   (`Golpe_id_golpe`     ASC),
+  CONSTRAINT `fk_Pokemon_Golpe_Pokemon`
+    FOREIGN KEY (`Pokemon_id_especie`)
+    REFERENCES `Pokemon` (`id_especie`)
+    ON DELETE NO ACTION ON UPDATE NO ACTION,
+  CONSTRAINT `fk_Pokemon_Golpe_Golpe`
+    FOREIGN KEY (`Golpe_id_golpe`)
+    REFERENCES `Golpe` (`id_golpe`)
+    ON DELETE NO ACTION ON UPDATE NO ACTION
+) ENGINE = InnoDB;
+
+
+-- -----------------------------------------------------
 -- Table `Pokemon_Torneio`.`Batalha`
 -- -----------------------------------------------------
 CREATE TABLE IF NOT EXISTS `Batalha` (
