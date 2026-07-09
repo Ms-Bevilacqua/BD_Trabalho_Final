@@ -28,18 +28,6 @@ python3 gerar_popular.py
 
 Carregar o banco, nesta ordem — o gatilho precisa existir **antes** da população, já que ele valida as inserções em `Time_Treinador`:
 
-**Sem `sudo`:**
-
-```bash
-mysql -u root < inicializar/1_esquema.sql
-mysql -u root < scripts/3_trigger.sql
-mysql -u root < scripts/2_popular.sql
-mysql -u root < scripts/3_triggerAtivado.sql
-mysql -u root < consultas/4_visao1.sql
-```
-
-**Com `sudo`:**
-
 ```bash
 sudo mysql < inicializar/1_esquema.sql
 sudo mysql < scripts/3_trigger.sql
