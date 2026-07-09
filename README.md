@@ -18,17 +18,17 @@
 ```
 
 ## Ordem de execução
-
+python3 gerar_popular.py
 ## bash
 mysql -u root < inicializar/1_esquema.sql
-mysql -u root < scripts/2_popular.sql
 mysql -u root < scripts/3_trigger.sql
+mysql -u root < scripts/2_popular.sql
 mysql -u root < scripts/3_triggerAtivado.sql
 mysql -u root < consultas/4_visao1.sql
 ## sudo
 sudo mysql < inicializar/1_esquema.sql
-sudo mysql < scripts/2_popular.sql
 sudo mysql < scripts/3_trigger.sql
+sudo mysql < scripts/2_popular.sql
 sudo mysql < scripts/3_triggerAtivado.sql
 sudo mysql < consultas/4_visao1.sql
 
