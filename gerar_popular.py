@@ -39,11 +39,7 @@ TIMEOUT = 4
 N_POKEMON = 151       # Geração I completa 
 N_TREINADORES = 120
 N_GOLPES_DESEJADOS = 110
-MIN_TIME_POR_TREINADOR = 3  # mínimo de Pokémon inscritos por treinador
-MAX_TIME_POR_TREINADOR = 6  # máximo (time completo)
-MIN_GOLPES_POR_POKEMON = 4  # mínimo de golpes que cada espécie pode aprender
-MAX_GOLPES_POR_POKEMON = 8  # máximo de golpes que cada espécie pode aprender
-# N_BATALHAS removido: o total é calculado automaticamente pela estrutura do torneio
+QTD_GOLPES_POR_POKEMON_PARA_GERACAO = 6
 
 # ---------------------------------------------------------------------
 # 1) BUSCA NA POKEAPI (uso real, requer internet liberada para pokeapi.co)
@@ -398,12 +394,20 @@ def montar_treinadores(rng):
 
 
 def montar_times(rng, treinadores, pokemons):
-    """Inscrição dos Pokémon no torneio: cada treinador escolhe
-    entre MIN e MAX espécies para o seu time.
+    """Inscrição dos Pokémon no torneio: cada treinador recebe uma
+    quantidade de espécies para o seu time.
+
+    Este script só POPULA — não reimplementa a regra de negócio do
+    limite de time (isso é feito pelo trg_limite_6, em Time_Treinador).
+    Mas como esse trigger existe e está ATIVO no banco, gerar mais de
+    6 linhas para o mesmo treinador faz o próprio INSERT deste arquivo
+    falhar com SIGNAL — não é uma escolha do Python, é uma restrição
+    do banco que qualquer dado inserido precisa respeitar para o
+    script rodar até o fim. Por isso o sorteio abaixo não passa de 6.
     A chave primária é (Treinador_id_treinador, Pokemon_id_especie)."""
     times = []
     for t in treinadores:
-        qtd = rng.randint(MIN_TIME_POR_TREINADOR, MAX_TIME_POR_TREINADOR)
+        qtd = rng.randint(1, min(6, len(pokemons)))
         especies_escolhidas = rng.sample(pokemons, k=qtd)
         for especie in especies_escolhidas:
             times.append({
@@ -432,7 +436,7 @@ def montar_pokemon_golpe(rng, pokemons, golpes):
     relacoes = []
 
     for p in pokemons:
-        qtd_alvo = rng.randint(MIN_GOLPES_POR_POKEMON, MAX_GOLPES_POR_POKEMON)
+        qtd_alvo = QTD_GOLPES_POR_POKEMON_PARA_GERACAO
 
         reais = [gid for gid in p.get("golpes_ids", []) if gid in catalogo_ids]
         reais = list(dict.fromkeys(reais))  # remove duplicados, preserva ordem
@@ -665,8 +669,12 @@ def main():
     sql.append("")
 
     sql.append("-- Tabela: Time_Treinador (Pokémon inscritos por treinador no torneio)")
+    # lote=1: trg_limite_6 é BEFORE INSERT ativo nesta tabela. Se o
+    # SIGNAL disparar, um INSERT em lote aborta o bloco inteiro; com
+    # lote=1 cada linha é seu próprio INSERT, então uma eventual
+    # violação afeta só aquela linha, não o restante do arquivo.
     sql.append(gerar_inserts("Time_Treinador",
-        ["Treinador_id_treinador", "Pokemon_id_especie"], linhas_time))
+        ["Treinador_id_treinador", "Pokemon_id_especie"], linhas_time, lote=1))
     sql.append("")
 
     sql.append("-- Tabela: Golpe (catálogo de golpes)")
