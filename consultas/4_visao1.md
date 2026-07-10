@@ -1,3 +1,7 @@
+# Artefato 5: Criação de Visão
+
+---
+
 # Sobre a View
 
 Como parte das regras de negócio do Torneio Pokémon, criamos a View `vw_ranking_treinadores`.
@@ -23,6 +27,14 @@ SELECT
   `nome`,
   `pontos_ranking`
 FROM `Treinador`
+ORDER BY `pontos_ranking` DESC;
+
+-- Execução
+SELECT
+  `id_treinador`,
+  `nome`,
+  `pontos_ranking`
+FROM `vw_ranking_treinadores`
 ORDER BY `pontos_ranking` DESC;
 ```
 
