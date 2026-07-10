@@ -1,28 +1,29 @@
+# Artefato 4 — Gatilhos (Triggers)
 
-
-# Neste arquivo contem explicação da regra de negocio dos seguintes gatilho ;
-# Trigger 1 : Atualizar Ranking Após Batalha
-# Trigger 2 : Limite maximo participantes
-
-## 1. Descrição 
-A tabela `Batalha` registra cada confronto realizado no torneio, armazenando informações como:
-
-- ID da batalha;
-- data da batalha;
-- fase do torneio;
-- treinador 1;
-- treinador 2;
-- treinador vencedor.
-
-Já a tabela `Treinador` possui o campo `pontos_ranking`, responsável por armazenar a pontuação atual de cada competidor no campeonato.
-
-Por isso, sempre que uma nova batalha for registrada, o ranking dos treinadores envolvidos precisa ser atualizado automaticamente.
+Este arquivo documenta as regras de negócio que fundamentam cada trigger implementada no banco de dados do Torneio Pokémon.
 
 ---
 
-## 2. Trigger Relacionada
+## Trigger 1 — `trg_atualiza_ranking_batalha`
 
-A trigger responsável por essa regra é:
+### Descrição
+
+A tabela `Batalha` registra cada confronto realizado no torneio, armazenando:
+
+| Campo | Descrição |
+|---|---|
+| `id_batalha` | Identificador único da batalha |
+| `data_batalha` | Data em que o confronto ocorreu |
+| `fase_torneio` | Fase do campeonato (ex.: Oitavas de Final) |
+| `Treinador_id_treinador` | Treinador participante 1 |
+| `Treinador_id_treinador1` | Treinador participante 2 |
+| `id_vencedor` | Treinador que venceu o confronto |
+
+A tabela `Treinador` possui o campo `pontos_ranking`, que armazena a pontuação acumulada de cada competidor. Sempre que uma batalha é registrada, esse campo precisa ser atualizado automaticamente para ambos os participantes.
+
+---
+
+### Código SQL
 
 ```sql
 DELIMITER $$
@@ -31,18 +32,17 @@ CREATE TRIGGER trg_atualiza_ranking_batalha
 AFTER INSERT ON Batalha
 FOR EACH ROW
 BEGIN
-  UPDATE Treinador
-  SET pontos_ranking = pontos_ranking + 3
-  WHERE id_treinador = NEW.id_vencedor;
+    UPDATE Treinador
+    SET pontos_ranking = pontos_ranking + 3
+    WHERE id_treinador = NEW.id_vencedor;
 
-  UPDATE Treinador
-  SET pontos_ranking = pontos_ranking + 1
-  WHERE id_treinador IN 
-  (
-    NEW.Treinador_id_treinador,
-    NEW.Treinador_id_treinador1
-  )
-  AND id_treinador <> NEW.id_vencedor;
+    UPDATE Treinador
+    SET pontos_ranking = pontos_ranking + 1
+    WHERE id_treinador IN (
+        NEW.Treinador_id_treinador,
+        NEW.Treinador_id_treinador1
+    )
+    AND id_treinador <> NEW.id_vencedor;
 END $$
 
 DELIMITER ;
@@ -50,105 +50,75 @@ DELIMITER ;
 
 ---
 
-## 3. Objetivo da Trigger
+### Objetivo
 
-O objetivo da trigger é **automatizar a atualização da pontuação dos treinadores no ranking** após o cadastro de uma nova batalha.
+Automatizar a atualização da pontuação dos treinadores sempre que uma nova batalha for cadastrada. Sem esta trigger, o usuário precisaria:
 
-Sem essa trigger, o usuário teria que:
-
-1. Inserir a batalha na tabela `Batalha`;
-2. Identificar manualmente quem venceu;
+1. Inserir a batalha em `Batalha`;
+2. Identificar manualmente o vencedor;
 3. Atualizar manualmente os pontos do vencedor;
 4. Atualizar manualmente os pontos do perdedor.
 
-Esse processo manual aumenta o risco de fraude, erro ou inconsistência nos dados.
-
-Com a trigger, o banco executa esse processo automaticamente sempre que uma batalha é registrada.
+Esse processo manual aumenta o risco de inconsistência, fraude ou esquecimento. Com a trigger, o banco executa tudo automaticamente a cada inserção.
 
 ---
 
-## 4. Regras de Negócio 
-### RN01 Toda batalha registrada deve impactar o ranking
+### Regras de Negócio
 
-Sempre que uma batalha for cadastrada no sistema, ela deve gerar alteração na pontuação dos treinadores envolvidos.
+**RN01 — Toda batalha registrada deve impactar o ranking**
+Sempre que um registro for inserido em `Batalha`, a pontuação de ambos os treinadores envolvidos deve ser atualizada. O ranking do campeonato é uma consequência direta dos resultados das batalhas e não pode ficar desatualizado.
 
-Isso é necessário porque o ranking do campeonato depende diretamente dos resultados das batalhas.
+**RN02 — O treinador vencedor recebe 3 pontos**
+O treinador identificado em `id_vencedor` recebe `+3` pontos no `pontos_ranking`. Essa regra valoriza a vitória e diferencia os treinadores na classificação.
 
----
+**RN03 — O treinador derrotado recebe 1 ponto**
+O treinador que participou, mas não venceu, recebe `+1` ponto. Isso garante que a participação seja recompensada, mesmo em derrota.
 
-### RN02 O treinador vencedor deve receber 3 pontos
-
-Quando uma batalha é finalizada, o treinador identificado no campo `id_vencedor` deve receber **3 pontos** no ranking.
-
-Essa regra valoriza a vitória e permite que os treinadores vencedores subam na classificação do campeonato.
-
----
-
-### RN03 O treinador derrotado deve receber 1 ponto
-
-O treinador que participou da batalha, mas não venceu, deve receber **1 ponto** no ranking.
-
-Essa regra permite que a participação também seja contabilizada, mesmo quando o treinador perde a batalha.
+**RN04 — A atualização deve ser automática e imediata**
+A pontuação não pode depender de ação manual do usuário. O banco deve garantir a consistência do ranking em toda inserção em `Batalha`, independentemente de como ela foi feita (via aplicação, script ou terminal).
 
 ---
 
-### RN04 A atualização do ranking deve ser automática
+## Trigger 2 — `trg_limite_6`
 
-A pontuação dos treinadores não deve depender de atualização manual feita pelo usuário.
+### Descrição
 
-O sistema deve garantir que, ao inserir uma batalha, o ranking seja atualizado imediatamente.
+A tabela `Time_Treinador` representa os Pokémon cadastrados no time de cada treinador, armazenando:
 
-Essa regra evita situações como:
+| Campo | Descrição |
+|---|---|
+| `id_instancia` | Identificador único da instância do Pokémon |
+| `apelido` | Apelido dado pelo treinador ao Pokémon |
+| `nivel` | Nível atual do Pokémon |
+| `experiencia` | Pontos de experiência acumulados |
+| `data_captura` | Data em que o Pokémon foi capturado |
+| `Treinador_id_treinador` | FK para o treinador dono do Pokémon |
+| `Pokemon_id_especie` | FK para a espécie do Pokémon |
 
-- batalha registrada sem alteração no ranking;
-- vencedor sem receber pontos;
-- perdedor sem receber pontuação de participação;
-- pontuação digitada incorretamente pelo usuário.
-
----
-
-# Regras de Negócio do Trigger 2 : Limite Maximo Pokemon 
-
-## 1. Contexto do Sistema
-
-O banco de dados representa o gerenciamento de um torneio Pokémon. Nesse sistema, cada treinador inscrito no campeonato pode possuir Pokémons cadastrados em seu time por meio da tabela `Time_Treinador`.
-
-A tabela `Time_Treinador` representa a relação entre um treinador e os Pokémons que ele possui. Ela armazena informações como:
-
-- ID da instância do Pokémon;
-- apelido do Pokémon;
-- nível;
-- experiência;
-- data de captura;
-- ID do treinador;
-- ID da espécie do Pokémon.
-
-Como o torneio segue uma regra comum do universo Pokémon, cada treinador deve possuir no máximo 6 Pokémons em seu time.
+Seguindo a regra canônica do universo Pokémon, cada treinador pode carregar no máximo **6 Pokémon** no time. Esta trigger garante que essa restrição seja aplicada diretamente pelo banco de dados.
 
 ---
 
-## 2. Trigger Relacionada
-
-A trigger responsável por essa regra é:
+### Código SQL
 
 ```sql
 DELIMITER $$
 
-CREATE TRIGGER trg_limite_6_pokemons
+CREATE TRIGGER trg_limite_6
 BEFORE INSERT ON Time_Treinador
 FOR EACH ROW
 BEGIN
-  DECLARE qtd_pokemons INT;
+    DECLARE total_pokemon INT;
 
-  SELECT COUNT(*)
-  INTO qtd_pokemons
-  FROM Time_Treinador
-  WHERE Treinador_id_treinador = NEW.Treinador_id_treinador;
+    SELECT COUNT(*)
+    INTO total_pokemon
+    FROM Time_Treinador
+    WHERE Treinador_id_treinador = NEW.Treinador_id_treinador;
 
-  IF qtd_pokemons >= 6 THEN
-    SIGNAL SQLSTATE '45000'
-    SET MESSAGE_TEXT = 'Um treinador não pode ter mais de 6 Pokémons no time.';
-  END IF;
+    IF total_pokemon >= 6 THEN
+        SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'Limite máximo de participantes atingido para este treinador.';
+    END IF;
 END $$
 
 DELIMITER ;
@@ -156,67 +126,21 @@ DELIMITER ;
 
 ---
 
-## 3. Objetivo 
+### Objetivo
 
-O objetivo da trigger é impedir que um treinador tenha mais de 6 Pokémons cadastrados em seu time.
-
-Essa validação é feita automaticamente antes da inserção de um novo registro na tabela `Time_Treinador`.
-
-Caso o treinador já possua 6 Pokémons cadastrados, o banco de dados bloqueia a operação e exibe uma mensagem de erro.
+Impedir que um treinador tenha mais de 6 Pokémon cadastrados em `Time_Treinador`. A verificação ocorre **antes** da inserção (`BEFORE INSERT`): se o limite já tiver sido atingido, o banco bloqueia a operação e exibe uma mensagem de erro, sem que nenhum dado seja gravado.
 
 ---
 
-## 4. Regras de Negócio que Demandam 
+### Regras de Negócio
 
-### RN01 Um treinador pode possuir no máximo 6 Pokémons no time
+**RN01 — Um treinador pode possuir no máximo 6 Pokémon no time**
+Cada treinador participante do torneio deve respeitar o limite de 6 Pokémon, regra fundamental do universo Pokémon. Ultrapassar esse limite daria vantagem indevida sobre os demais competidores.
 
-Cada treinador participante do torneio deve respeitar o limite máximo de 6 Pokémons cadastrados.
+**RN02 — O limite deve ser verificado antes do cadastro de um novo Pokémon**
+Antes de qualquer inserção em `Time_Treinador`, o sistema conta quantos Pokémon o treinador já possui. Se o total for igual ou maior que 6, a inserção é cancelada com `SIGNAL SQLSTATE '45000'`.
 
-Essa regra evita que um treinador tenha vantagem indevida sobre os demais competidores.
-
----
-
-### RN02 O limite deve ser verificado antes do cadastro de um novo Pokémon
-
-Antes de inserir um novo Pokémon na tabela `Time_Treinador`, o sistema deve verificar quantos Pokémons o treinador já possui.
-
-Se o treinador já tiver 6 Pokémons, a nova inserção não deve ser permitida.
+**RN03 — A regra deve ser aplicada pelo próprio banco de dados**
+A validação não pode depender somente da aplicação ou do usuário. Mesmo uma inserção direta via terminal MySQL deve ser bloqueada caso o limite esteja atingido, garantindo a integridade dos dados em qualquer cenário de uso.
 
 ---
-
-### RN03 A regra deve ser aplicada automaticamente pelo banco de dados
-
-A validação não deve depender apenas da aplicação ou do usuário.
-
-Mesmo que alguém tente cadastrar um Pokémon diretamente pelo MySQL, o banco deve impedir a inserção caso o limite seja ultrapassado.
-
----
-
-## 5. Funcionamento 
-
-A trigger é executada antes de cada inserção na tabela `Time_Treinador`.
-
-Primeiro, ela conta quantos Pokémons já estão cadastrados para o treinador informado:
-
-```sql
-SELECT COUNT(*)
-INTO qtd_pokemons
-FROM Time_Treinador
-WHERE Treinador_id_treinador = NEW.Treinador_id_treinador;
-```
-
-Depois, verifica se essa quantidade é maior ou igual a 6:
-
-```sql
-IF qtd_pokemons >= 6 THEN
-```
-
-Se o limite já tiver sido atingido, a operação é bloqueada com o comando:
-
-```sql
-SIGNAL SQLSTATE '45000'
-SET MESSAGE_TEXT = 'Um treinador não pode ter mais de 6 Pokémons no time.';
-```
-
----
-
