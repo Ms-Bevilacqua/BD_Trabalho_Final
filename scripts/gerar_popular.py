@@ -39,7 +39,7 @@ TIMEOUT = 4
 N_POKEMON = 151       # Geração I completa 
 N_TREINADORES = 120
 N_GOLPES_DESEJADOS = 110
-QTD_GOLPES_POR_POKEMON_PARA_GERACAO = 6
+QTD_GOLPES_POR_POKEMON_PARA_GERACAO = 4
 
 # ---------------------------------------------------------------------
 # 1) BUSCA NA POKEAPI (uso real, requer internet liberada para pokeapi.co)
