@@ -47,8 +47,6 @@ sudo mysql < scripts/3_triggerAtivado.sql
 sudo mysql < consultas/4_visao1.sql
 ```
 
-Todos os scripts foram testados de ponta a ponta em uma instância MariaDB 10.11, sem erros, nesta ordem.
-
 ## Sobre a integração com a PokeAPI
 
 `scripts/gerar_popular.py` foi escrito para buscar os dados de `Pokemon` (incluindo tipos e a cadeia de evolução, via `/pokemon`, `/pokemon-species` e `/evolution-chain`) e de `Golpe` (via `/move`) **diretamente na PokeAPI real** (`https://pokeapi.co/api/v2/`). Os dados de `Treinador`, `Time_Treinador`, `Pokemon_Golpe` e `Batalha` são sempre gerados localmente (com `Faker`), já que não existem na PokeAPI.
