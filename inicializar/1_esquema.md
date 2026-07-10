@@ -1,5 +1,5 @@
 # Sobre o esquema 
-O esquema relacional do banco de dados Torneio Pokémon foi desenvolvido seguindo os princípios de normalização, atendendo às três primeiras Formas Normais (1FN, 2FN e 3FN). A aplicação dessas regras reduz redundâncias, evita inconsistências e facilita a manutenção dos dados.
+O esquema relacional do banco de dados Torneio Pokémon foi desenvolvido seguindo os princípios de normalização, atendendo às duas primeiras Formas Normais. 
 
 ### 1. Primeira Forma Normal (1FN)
 A Primeira Forma Normal estabelece que todos os atributos de uma tabela devem conter valores atômicos e monovalorados, ou seja, cada campo deve armazenar apenas um único valor, sem listas, grupos repetitivos ou atributos compostos.
