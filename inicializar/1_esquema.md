@@ -17,3 +17,14 @@ Time_Treinador: PRIMARY KEY (Treinador_id_treinador, Pokemon_id_especie)
 Pokemon_Golpe: PRIMARY KEY (Pokemon_id_especie, Golpe_id_golpe)
 
 Solução: Essas tabelas possuem apenas a função de representar os relacionamentos entre as entidades e não armazenam atributos que dependam parcialmente da chave composta. Assim, todos os dados presentes dependem da chave como um todo, satisfazendo a Segunda Forma Normal. Já as demais tabelas (Treinador, Pokemon, Golpe e Batalha), por possuírem chaves primárias simples, atendem naturalmente aos requisitos da 2FN.
+
+# Sobre as tabelas
+Desenvolvemos um banco de dados composto por 6 tabelas principais: 
+-Treinador (dados de competidores)
+-Pokémon (catálogo de espécies)
+-Golpe (ataques que podem ser utilizados pelos Pokémon)
+-Time_Treinador (treinadores e seus pokemons)
+-Batalha (trigger)
+-Pokemon_Golpe (ligação entre pokemon e seu golpe)
+
+A estrutura foi projetada para separar os dados estáticos do universo Pokémon, como espécies, evoluções e golpes, dos dados dinâmicos do torneio, como participantes, equipes, confrontos e o histórico das batalhas.
