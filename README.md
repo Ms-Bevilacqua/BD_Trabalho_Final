@@ -1,5 +1,5 @@
 # Torneio Pokémon — Banco de Dados
-## Requisitos: 
+## Requisitos para Executar o gerar_popular.py: 
 ```
 python3
 

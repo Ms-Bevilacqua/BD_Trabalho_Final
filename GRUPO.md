@@ -25,9 +25,10 @@ As tabelas do sistema e seus respectivos atributos são:
 
 6. **Batalha:** histórico oficial das partidas. Cada registro armazena um **ID único, a data e o local do confronto, a fase do torneio, os IDs dos dois treinadores envolvidos (Treinador 1 e Treinador 2) e o ID do treinador que saiu vitorioso** (quando já decidida).
 
-## Requisitos: 
+## Requisitos para Executar o gerar_popular.py: 
 ```
 python3
+
 pip install requests faker
 
 ```
