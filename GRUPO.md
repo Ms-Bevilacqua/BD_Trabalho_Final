@@ -7,7 +7,7 @@
 * Mylena Ágatha Martins Fernandez — RGA: 202321901035
 
 ### Contexto:
-Nesse trabalho teremos o gerenciamento de um **torneio Pokémon**. Nele faremos as inscrições dos competidores, catalogaremos as espécies de criaturas (e seus dados de evolução) e os golpes que elas podem usar em batalha, registraremos a posse e o nível dos Pokémon de cada participante, e manteremos um log (histórico) automatizado de todas as batalhas e da classificação do campeonato.
+O objetivo deste projeto é o gerenciamento completo de um Torneio Pokémon. O sistema é responsável por registrar as inscrições dos competidores, catalogar as espécies de criaturas (incluindo sua respectiva linha evolutiva), gerenciar os golpes de ataque disponíveis e os times inscritos por cada treinador. Além disso, o banco mantém um histórico automatizado e consistente de todos os confrontos ocorridos ao longo do campeonato e a classificação dinâmica dos participantes.
 
 Os dados de espécies de Pokémon e de golpes são originados da [PokeAPI](https://pokeapi.co/docs/v2), incluindo a seção de evolução (`/evolution-chain`), usada para saber para qual espécie cada Pokémon evolui.
 
@@ -21,7 +21,7 @@ As tabelas do sistema e seus respectivos atributos são:
 
 4. **Time_Treinador:** relação entre Pokémon e Treinadores, indicando a qual competidor cada criatura capturada pertence. Nela, registram-se: **o id da instância, o apelido dado pelo treinador, o nível atual, os pontos de experiência, a data em que foi capturado, o id do treinador e o id da espécie.**
 
-5. **Time_Treinador_Golpe:** tabela de associação entre `Time_Treinador` e `Golpe`, indicando **quais golpes cada Pokémon do time conhece** (um Pokémon pode conhecer vários golpes, e um mesmo golpe pode ser usado por vários Pokémon diferentes — por isso esta relação não poderia ser representada apenas com uma chave estrangeira direta em `Golpe`).
+5. **Pokemon_Golpe:** Mapeia quais golpes cada espécie de Pokémon é biologicamente capaz de aprender no ecossistema do torneio. Tem como atributos Pokemon_id_especie (Chave Estrangeira) e Golpe_id_golpe (Chave Estrangeira). A chave primária é composta por ambos os campos.
 
 6. **Batalha:** histórico oficial das partidas. Cada registro armazena um **ID único, a data e o local do confronto, a fase do torneio, os IDs dos dois treinadores envolvidos (Treinador 1 e Treinador 2) e o ID do treinador que saiu vitorioso** (quando já decidida).
 
