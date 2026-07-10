@@ -20,11 +20,11 @@ Solução: Essas tabelas possuem apenas a função de representar os relacioname
 
 # Sobre as tabelas
 Desenvolvemos um banco de dados composto por 6 tabelas principais: 
--Treinador (dados de competidores)
--Pokémon (catálogo de espécies)
--Golpe (ataques que podem ser utilizados pelos Pokémon)
--Time_Treinador (treinadores e seus pokemons)
--Batalha (trigger)
--Pokemon_Golpe (ligação entre pokemon e seu golpe)
+*Treinador (dados de competidores)
+*Pokémon (catálogo de espécies)
+*Golpe (ataques que podem ser utilizados pelos Pokémon)
+*Time_Treinador (treinadores e seus pokemons)
+*Batalha (trigger)
+*Pokemon_Golpe (ligação entre pokemon e seu golpe)
 
 A estrutura foi projetada para separar os dados estáticos do universo Pokémon, como espécies, evoluções e golpes, dos dados dinâmicos do torneio, como participantes, equipes, confrontos e o histórico das batalhas.
