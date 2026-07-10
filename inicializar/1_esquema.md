@@ -1,3 +1,14 @@
+# Sobre as tabelas
+Desenvolvemos um banco de dados composto por 6 tabelas principais: 
+1. Treinador (dados de competidores)
+2. Pokémon (catálogo de espécies)
+3. Golpe (ataques que podem ser utilizados pelos Pokémon)
+4. Time_Treinador (treinadores e seus pokemons)
+5. Batalha (trigger)
+6. Pokemon_Golpe (ligação entre pokemon e seu golpe)
+
+A estrutura foi projetada para separar os dados estáticos do universo Pokémon, como espécies, evoluções e golpes, dos dados dinâmicos do torneio, como participantes, equipes, confrontos e o histórico das batalhas.
+
 # Sobre o esquema 
 O esquema relacional do banco de dados Torneio Pokémon foi desenvolvido seguindo os princípios de normalização, atendendo às duas primeiras Formas Normais. 
 
@@ -17,14 +28,3 @@ Time_Treinador: PRIMARY KEY (Treinador_id_treinador, Pokemon_id_especie)
 Pokemon_Golpe: PRIMARY KEY (Pokemon_id_especie, Golpe_id_golpe)
 
 Solução: Essas tabelas possuem apenas a função de representar os relacionamentos entre as entidades e não armazenam atributos que dependam parcialmente da chave composta. Assim, todos os dados presentes dependem da chave como um todo, satisfazendo a Segunda Forma Normal. Já as demais tabelas (Treinador, Pokemon, Golpe e Batalha), por possuírem chaves primárias simples, atendem naturalmente aos requisitos da 2FN.
-
-# Sobre as tabelas
-Desenvolvemos um banco de dados composto por 6 tabelas principais: 
-1. Treinador (dados de competidores)
-2. Pokémon (catálogo de espécies)
-3. Golpe (ataques que podem ser utilizados pelos Pokémon)
-4. Time_Treinador (treinadores e seus pokemons)
-5. Batalha (trigger)
-6. Pokemon_Golpe (ligação entre pokemon e seu golpe)
-
-A estrutura foi projetada para separar os dados estáticos do universo Pokémon, como espécies, evoluções e golpes, dos dados dinâmicos do torneio, como participantes, equipes, confrontos e o histórico das batalhas.
