@@ -19,16 +19,10 @@
 
 ## Ordem de execução
 
-Gerar o arquivo de população (opcional — o repositório já entrega `scripts/2_popular.sql` pronto e validado):
+Gerar o arquivo de população (opcional — o repositório já entrega `scripts/2_popular.sql` pronto e validado) Carregar o banco, nesta ordem — o gatilho precisa existir **antes** da população, já que ele valida as inserções em `Time_Treinador`:
 
 ```bash
-cd scripts
-python3 gerar_popular.py
-```
-
-Carregar o banco, nesta ordem — o gatilho precisa existir **antes** da população, já que ele valida as inserções em `Time_Treinador`:
-
-```bash
+python3 scripts/gerar_popular.py
 sudo mysql < inicializar/1_esquema.sql
 sudo mysql < scripts/3_trigger.sql
 sudo mysql < scripts/2_popular.sql
