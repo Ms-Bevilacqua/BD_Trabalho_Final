@@ -1,28 +1,19 @@
-# Torneio Pokémon — Banco de Dados I (UFMT)
-
-## Estrutura do projeto
+# Torneio Pokémon — Banco de Dados
+## Requisitos: 
+```
+python3
+pip install requests faker
 
 ```
-/GRUPO.md                          Artefato 1 — descrição do problema
-/inicializar/1_esquema.sql         Artefato 2 — criação do banco e tabelas
-/inicializar/1_esquema.md          Artefato 2 — UML + explicação das correções
-/inicializar/diagrama.png          Diagrama ER (gerado por gerar_diagrama.py)
-/inicializar/gerar_diagrama.py     Script auxiliar que gera o diagrama.png
-/scripts/2_popular.sql             Artefato 3 — população das tabelas (100+ linhas cada)
-/scripts/gerar_popular.py          Script que gera o 2_popular.sql (busca dados na PokeAPI)
-/scripts/3_trigger.sql             Artefato 4 — criação do gatilho
-/scripts/3_trigger.md              Artefato 4 — explicação da regra de negócio
-/scripts/3_triggerAtivado.sql      Artefato 4 — ativação do gatilho (antes/depois)
-/consultas/4_visao1.sql            Artefato 5 — criação e execução da visão
-/consultas/4_visao1.md             Artefato 5 — justificativa da visão
-```
-
 ## Ordem de execução
 
-Gerar o arquivo de população (opcional — o repositório já entrega `scripts/2_popular.sql` pronto e validado) Carregar o banco, nesta ordem — o gatilho precisa existir **antes** da população, já que ele valida as inserções em `Time_Treinador`:
-
+Gerar o arquivo de população (opcional — o repositório já entrega `scripts/2_popular.sql` pronto e validado):
 ```bash
 python3 scripts/gerar_popular.py
+```
+ Carregar o banco, nesta ordem — o gatilho precisa existir **antes** da população, já que ele valida as inserções em `Time_Treinador`:
+
+```bash
 sudo mysql < inicializar/1_esquema.sql
 sudo mysql < scripts/3_trigger.sql
 sudo mysql < scripts/2_popular.sql
