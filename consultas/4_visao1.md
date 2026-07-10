@@ -38,21 +38,7 @@ Criamos esta View para:
 
 ---
 
-## 3. Estrutura: colunas expostas x colunas ocultas
-
-A tabela `Treinador` tem 5 colunas; a View projeta apenas 3 delas:
-
-| Coluna | Exposta na View? | Motivo |
-|---|:---:|---|
-| `id_treinador` | Sim | identifica de forma única cada treinador no ranking |
-| `nome` | Sim | necessário para saber quem ocupa cada posição |
-| `pontos_ranking` | Sim | métrica central da classificação; campo usado na ordenação |
-| `cidade` | Não | não influencia a pontuação; irrelevante para quem consulta o ranking |
-| `data_inscricao` | Não | dado administrativo do cadastro, sem relação com o desempenho no torneio |
-
----
-
-## 4. Regras de negócio atendidas
+## 3. Regras de negócio atendidas
 
 ### RN01 — O ranking deve refletir sempre a pontuação mais atual dos treinadores
 Por ser uma tabela virtual, e não uma cópia dos dados, a View nunca fica desatualizada: qualquer alteração em `pontos_ranking` — como as feitas pela trigger `trg_atualiza_ranking_batalha` após cada batalha — aparece imediatamente na próxima consulta à View, sem necessidade de recriá-la.
@@ -65,7 +51,7 @@ Campos como `cidade` e `data_inscricao`, que fazem sentido no cadastro do treina
 
 ---
 
-## 5. Exemplo de uso e saída esperada
+## 4. Exemplo de uso e saída esperada
 
 ```sql
 SELECT * FROM vw_ranking_treinadores;
