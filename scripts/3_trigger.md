@@ -1,4 +1,4 @@
-# Artefato 4 — Gatilhos (Triggers)
+# Gatilhos (Triggers)
 
 Este arquivo documenta as regras de negócio que fundamentam cada trigger implementada no banco de dados do Torneio Pokémon.
 
